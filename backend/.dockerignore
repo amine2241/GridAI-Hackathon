@@ -1,0 +1,13 @@
+venv
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.db
+data/
+.env
+.git
+.gitignore
+agent.log
+startup_log.txt

@@ -1,0 +1,91 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+.yarn/install-state.gz
+
+# testing
+coverage/
+
+# next.js
+.next/
+out/
+
+# production
+build/
+
+# misc
+.DS_Store
+*.pem
+Thumbs.db
+*.log
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# local env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+backend/venv/
+backend/.langgraph_api/
+
+# Python compiled files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Python specific
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+
+
+# Database and logs
+backend/*.db
+backend/*.db-*
+backend/*.log
+backend/*.txt
+backend/*.json
+backend/test_*.py
+backend/debug_*.py
+backend/inspect_*.py
+backend/repro_*.py
+backend/reproduce_*.py
+backend/fix_*.py
+backend/agent_sig.txt
+backend/openai_copy.py
+backend/sig.txt
+!backend/requirements.txt
+!backend/langgraph.json
+!backend/seed_agents.py
+!backend/migrate_db.py
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDEs
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+.qoder/
+
+# Turbo
+.turbo
