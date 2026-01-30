@@ -4,7 +4,7 @@
 
 A state-of-the-art multi-agent system for energy and utility management. This platform leverages LangGraph for complex reasoning, Pipecat for real-time voice interaction, and RAG for technical troubleshooting.
 ## Demonstration Video Link 
-- [Demonstration Video](https://www.docker.com/products/docker-desktop/](https://drive.google.com/drive/folders/1Ttes33AsuhNNjXWmZ4MwU71HV6Olsovk?usp=drive_link)
+- [Docker Desktop]([https://www.docker.com/products/docker-desktop/](https://drive.google.com/drive/folders/1Ttes33AsuhNNjXWmZ4MwU71HV6Olsovk?usp=drive_link)) (Windows/macOS) or Docker Engine + Docker Compose (Linux).
 ## Technical Features
 
 - **Multi-Agent Orchestration**: Orchestrated by **LangGraph**, the system manages complex workflows between multiple specialized agents (Supervisor, Support, RAG, Ticket, Analyze, IoT).
