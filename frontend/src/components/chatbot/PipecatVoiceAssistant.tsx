@@ -1,7 +1,5 @@
 "use client"
 
-"use client"
-
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { PhoneOff, Loader2, Mic, MicOff, Volume2 } from "lucide-react"
@@ -17,10 +15,12 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
     const [status, setStatus] = useState<"connecting" | "connected" | "error">("connecting")
     const [isMuted, setIsMuted] = useState(false)
     const [isUserSpeaking, setIsUserSpeaking] = useState(false)
+    const [isAgentSpeaking, setIsAgentSpeaking] = useState(false)
+
     const socketRef = useRef<WebSocket | null>(null)
     const playerRef = useRef<PCMPlayer | null>(null)
     const capturerRef = useRef<PCMCapturer | null>(null)
-    const isMutedRef = useRef(false) // Use a ref to access current muted state in callback
+    const isMutedRef = useRef(false)
     const isUserSpeakingRef = useRef(false)
 
     useEffect(() => {
@@ -36,10 +36,10 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
 
         const connect = async () => {
             try {
-                // Initialize PCM Player
+                // Initialize PCM Player (Audio Playback)
                 playerRef.current = new PCMPlayer(16000)
 
-                // Use the threadId passed in props
+                // WebSocket URL from environment or fallback
                 const wsUrl = `ws://localhost:8000/ws/voice?thread_id=${threadId}`
                 const ws = new WebSocket(wsUrl)
                 ws.binaryType = "arraybuffer"
@@ -50,23 +50,22 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
                     setStatus("connected")
                     toast.success("Voice Connected")
 
-                    // Start Capturer with VAD
+                    // Start Capturer (Microphone Input) with VAD
                     capturerRef.current = new PCMCapturer((data) => {
-                        // Simple voice activity detection based on volume
+                        // Simple VAD based on volume averages
                         let sum = 0
                         for (let i = 0; i < data.length; i++) {
                             sum += Math.abs(data[i])
                         }
                         const avgVolume = sum / data.length
-                        // Increased threshold to prevent background noise triggering 'speaking'
-                        const isSpeaking = avgVolume > 2000
+                        const isSpeaking = avgVolume > 1500 // Threshold for speech
 
-                        // If user starts speaking, stop playback immediately
                         if (isSpeaking && !isUserSpeakingRef.current) {
                             setIsUserSpeaking(true)
+                            // Immediate interruption: clear playback buffer
                             playerRef.current?.clearBuffer()
+                            setIsAgentSpeaking(false)
                         } else if (!isSpeaking && isUserSpeakingRef.current) {
-                            // Debounce silence detection could be added here
                             setIsUserSpeaking(false)
                         }
 
@@ -74,6 +73,7 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
                             ws.send(data.buffer)
                         }
                     })
+
                     await capturerRef.current.start().catch(err => {
                         console.error("Capturer start error:", err)
                         toast.error("Microphone access failed")
@@ -82,40 +82,36 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
 
                 ws.onerror = (e) => {
                     console.error("WebSocket Error Event:", e)
-                    // Don't set error status immediately on error event, wait for close
                 }
 
                 ws.onclose = (event) => {
                     console.log(`WebSocket closed: Code ${event.code}, Reason: ${event.reason}`)
                     if (mounted) {
-                        // If it was a clean close, we might want to just disconnect
-                        // If it was error (1006), show error
-                        if (event.code === 1000 || event.code === 1005) {
-                            onDisconnect()
-                        } else {
-                            // setStatus("error")
-                            // For now, let's just disconnect to avoid getting stuck in error state
-                            onDisconnect()
+                        if (event.code !== 1000 && event.code !== 1005) {
+                            toast.error("Voice connection lost")
                         }
+                        onDisconnect()
                     }
                 }
 
                 ws.onmessage = async (event) => {
-                    // Handle text messages (interruption signals)
+                    // 1. Handle text signals (Interruption from server)
                     if (typeof event.data === 'string') {
                         if (event.data === '__INTERRUPT__') {
                             console.log("[Interruption] Backend signal received, stopping playback")
                             playerRef.current?.clearBuffer()
                             setIsUserSpeaking(true)
+                            setIsAgentSpeaking(false)
                         }
                         return
                     }
 
-                    // Handle binary audio data
+                    // 2. Handle binary audio data
                     if (event.data instanceof ArrayBuffer) {
                         const int16Data = new Int16Array(event.data)
-                        // Only play if user is not speaking
+                        // Only play if user isn't currently speaking (Double check VAD)
                         if (!isUserSpeakingRef.current) {
+                            if (!isAgentSpeaking) setIsAgentSpeaking(true)
                             playerRef.current?.playChunk(int16Data)
                         }
                     }
@@ -136,11 +132,10 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
             mounted = false
             cleanup()
         }
-    }, [threadId, onDisconnect]) // Added threadId to deps
+    }, [threadId, onDisconnect])
 
     const cleanup = () => {
         if (socketRef.current) {
-            // Close only if open or connecting
             if (socketRef.current.readyState === WebSocket.OPEN || socketRef.current.readyState === WebSocket.CONNECTING) {
                 socketRef.current.close()
             }
@@ -154,6 +149,10 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
             playerRef.current.stop()
             playerRef.current = null
         }
+    }
+
+    const toggleMute = () => {
+        setIsMuted(!isMuted)
     }
 
     if (status === "error") {
@@ -192,10 +191,12 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
                         <div className="flex flex-col items-center gap-2">
                             <div className="flex gap-1 items-center h-24">
                                 {[...Array(5)].map((_, i) => (
-                                    <div key={i} className="w-2 bg-blue-400/80 rounded-full animate-bounce" style={{ height: `${Math.random() * 40 + 20}px`, animationDelay: `${i * 0.1}s` }} />
+                                    <div key={i} className="w-2 bg-blue-400/80 rounded-full animate-bounce" style={{ height: isAgentSpeaking ? `${Math.random() * 40 + 20}px` : '4px', animationDelay: `${i * 0.1}s` }} />
                                 ))}
                             </div>
-                            <span className="text-xs text-blue-400/80 font-mono tracking-widest mt-2 uppercase">Speaking</span>
+                            <span className="text-xs text-blue-400/80 font-mono tracking-widest mt-2 uppercase">
+                                {isAgentSpeaking ? "Speaking" : "Waiting"}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -206,7 +207,7 @@ export function PipecatVoiceAssistant({ threadId, onDisconnect }: PipecatVoiceAs
                     variant={isMuted ? "destructive" : "secondary"}
                     size="icon"
                     className="rounded-full h-12 w-12"
-                    onClick={() => setIsMuted(!isMuted)}
+                    onClick={toggleMute}
                 >
                     {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                 </Button>
